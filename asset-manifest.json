@@ -1,0 +1,14 @@
+{
+  "files": {
+    "main.css": "/almost-toolbox/static/css/main.28021d90.css",
+    "main.js": "/almost-toolbox/static/js/main.7b346679.js",
+    "static/media/schematic.jpg": "/almost-toolbox/static/media/schematic.744d9ebce54638cb3198.jpg",
+    "index.html": "/almost-toolbox/index.html",
+    "main.28021d90.css.map": "/almost-toolbox/static/css/main.28021d90.css.map",
+    "main.7b346679.js.map": "/almost-toolbox/static/js/main.7b346679.js.map"
+  },
+  "entrypoints": [
+    "static/css/main.28021d90.css",
+    "static/js/main.7b346679.js"
+  ]
+}
