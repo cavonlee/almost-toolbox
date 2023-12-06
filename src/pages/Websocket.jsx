@@ -1,330 +1,468 @@
-import React from "react";
-import { Container, Button, Spinner, Card, Form, InputGroup, Nav, FloatingLabel } from "react-bootstrap";
-import Dropdown from 'react-bootstrap/Dropdown';
-import DropdownButton from 'react-bootstrap/DropdownButton';
+import React, {
+  useState,
+} from "react";
+import {
+  Container,
+  Button,
+  ToggleButton,
+  ButtonGroup,
+  Spinner,
+  Card,
+  Form,
+  InputGroup,
+  FloatingLabel,
+  ListGroup,
+  Stack,
+  CloseButton,
+  Dropdown,
+  DropdownButton,
+} from "react-bootstrap";
+import * as Icon from 'react-bootstrap-icons';
 import Editor from '@monaco-editor/react';
 
 import './Websocket.css';
 
 const DataType = [
-  "int8",
-  "uint8",
-  "int16",
-  "uint16",
-  "int32",
-  "uint32",
-  "int64",
-  "uint64",
-  "float32",
-  "float64",
+  { name: "Int8", id: "int8", setFunc: "setInt8", length: 1 },
+  { name: "Uint8", id: "uint8", setFunc: "setUint8", length: 1 },
+  { name: "Int16", id: "int16", setFunc: "setInt16", length: 2 },
+  { name: "Uint16", id: "uint16", setFunc: "setUint16", length: 2 },
+  { name: "Int32", id: "int32", setFunc: "setInt32", length: 4 },
+  { name: "Uint32", id: "uint32", setFunc: "setUint32", length: 4 },
+  { name: "Int64", id: "int64", setFunc: "setBigInt64", length: 8 },
+  { name: "Uint64", id: "uint64", setFunc: "setBigUint64", length: 8 },
+  { name: "Float32", id: "float32", setFunc: "setFloat32", length: 4 },
+  { name: "Float64", id: "float64", setFunc: "setFloat64", length: 8 },
 ]
 
-class Websocket extends React.Component {
-  constructor(props) {
-    super(props);
-    this.state = {
-      urlProtocol: "ws://",
-      urlHostname: "",
-      urlPort: "",
-      url: "",
-      connectionState: 'disconnected',
-      ws: null,
-      sendMode: "text",
-      sendTextBuffer: "",
-      sendJSONBuffer: "",
-      sendArrayBufferData: [],
-      sendArrayBufferType: [],
-    }
-  }
+const BinaryType = [
+  { name: "Blob", id: "blob" },
+  { name: "ArrayBuffer", id: "arraybuffer" },
+]
 
-  connectWs = (url) => {
-    console.log("connecting to", url);
+const Websocket = (props) => {
+  const [urlProtocol, setUrlProtocol] = useState(window.localStorage.getItem("websocket-urlProtocol") || "ws://");
+  const [urlHostname, setUrlHostname] = useState(window.localStorage.getItem("websocket-urlHostname") || "");
+  const [urlPort, setUrlPort] = useState(window.localStorage.getItem("websocket-urlPort") || "");
+  const [connectionState, setConnectionState] = useState('disconnected');
+  const [ws, setWs] = useState(null);
+  const [receivedData, setReceivedData] = useState([]);
+
+  const connectWs = (url) => {
     let ws;
     ws = new WebSocket(url);
     ws.onopen = () => {
-      console.log("connected");
-      this.props.toast("成功", "连接成功");
-      this.setState({ connectionState: "connected" });
+      props.toast("成功", "连接成功");
+      setConnectionState("connected");
     }
     ws.onmessage = (e) => {
       console.log(e.data);
+      setReceivedData(receivedData.concat(e.data));
     }
     ws.onclose = () => {
-      console.log("disconnected");
-      this.props.toast("", "连接断开");
-      this.setState({ connectionState: "disconnected" });
+      props.toast("", "连接断开");
+      setConnectionState("disconnected");
     }
     ws.onerror = (e) => {
-      console.log(e);
-      this.props.toast("连接失败", e);
+      props.toast("连接失败", e);
     }
-    this.setState({ ws: ws });
+    setWs(ws);
   }
 
-  handleConnect = () => {
-    let url = this.state.urlProtocol + this.state.urlHostname + ":" + this.state.urlPort;
-    window.localStorage.setItem("websocket-urlProtocol", this.state.urlProtocol);
-    window.localStorage.setItem("websocket-urlHostname", this.state.urlHostname);
-    window.localStorage.setItem("websocket-urlPort", this.state.urlPort);
-    this.connectWs(url);
-    this.setState({
-      connectionState: "connecting",
-      url: url
-    });
+  const handleConnect = () => {
+    let url = urlProtocol + urlHostname + ":" + urlPort;
+    window.localStorage.setItem("websocket-urlProtocol", urlProtocol);
+    window.localStorage.setItem("websocket-urlHostname", urlHostname);
+    window.localStorage.setItem("websocket-urlPort", urlPort);
+    connectWs(url);
+    setConnectionState("connecting");
   }
 
-  handleDisconnect = () => {
-    if (this.state.ws) {
-      this.state.ws.close();
-      this.props.toast("成功", "断开连接");
+  const handleDisconnect = () => {
+    if (ws) {
+      ws.close();
+      props.toast("成功", "断开连接");
     } else {
-      this.props.toast("错误", "未连接服务器");
-      console.log("未连接服务器");
+      props.toast("错误", "未连接服务器");
     }
-    this.setState({ connectionState: "disconnecting" });
+    setConnectionState("disconnected");
   }
 
-  connectionCheck = () => {
-    if (this.state.ws && this.state.ws.readyState === WebSocket.OPEN) {
+  const connectionCheck = () => {
+    if (ws && ws.readyState === WebSocket.OPEN) {
       return true;
     } else {
-      this.props.toast("错误", "未连接服务器，请先连接");
-      console.log("未连接服务器，请先连接");
+      props.toast("错误", "未连接服务器，请先连接");
       return false;
     }
   }
 
-  handleModeChange = (mode) => {
-    window.localStorage.setItem("websocket-sendMode", mode);
-    this.setState({ sendMode: mode });
-  }
-
-  handleSendText = () => {
-    window.localStorage.setItem("websocket-sendTextBuffer", this.state.sendTextBuffer);
-    if (this.state.ws) {
-      this.state.ws.send(this.state.sendTextBuffer);
+  const handleSend = (data) => {
+    if (connectionCheck()) {
+      ws.send(data);
     }
   }
 
-  handleSendJSON = () => {
-    window.localStorage.setItem("websocket-sendJSONBuffer", this.state.sendJSONBuffer);
-    let jsonString = JSON.stringify(JSON.parse(this.state.sendJSONBuffer));
-    console.log("sendJSONBuffer", jsonString);
-    if (this.state.ws) {
-      this.state.ws.send(jsonString);
-    }
+  const handleBinaryTypeChanged = (type) => {
+    console.log(type);
+    if (!connectionCheck()) return;
+    ws.binaryType = type;
   }
 
-  handleSendArrayBufferAddDataPiece = () => {
-    let arrayBufferType = this.state.sendArrayBufferType;
-    let arrayBufferData = this.state.sendArrayBufferData;
-    arrayBufferType.push([]);
-    arrayBufferData.push([]);
-    window.localStorage.setItem("websocket-sendArrayBufferType", JSON.stringify(arrayBufferType));
-    window.localStorage.setItem("websocket-sendArrayBufferData", JSON.stringify(arrayBufferData));
-    this.setState({
-      sendArrayBufferType: arrayBufferType,
-      sendArrayBufferData: arrayBufferData,
-    });
+  return <Container className="websocket" style={{ marginTop: "20px" }} >
+    {/* 连接输入组 */}
+    < InputGroup className="mb-3" >
+      <Dropdown
+        onSelect={(e) => setUrlProtocol(e)}>
+        <DropdownButton
+          variant="outline-secondary"
+          title={urlProtocol}
+          id="input-group-dropdown-1"
+        >
+          <Dropdown.Item eventKey="ws://">ws://</Dropdown.Item>
+          <Dropdown.Item eventKey="wss://">wss://</Dropdown.Item>
+        </DropdownButton>
+      </Dropdown>
+      <Form.Control
+        placeholder="ip"
+        aria-label="hostname"
+        aria-describedby="basic-addon1"
+        value={urlHostname}
+        onChange={(e) => setUrlHostname(e.target.value)}
+      />
+      <Form.Control
+        placeholder="端口"
+        aria-label="port"
+        aria-describedby="basic-addon1"
+        value={urlPort}
+        onChange={(e) => setUrlPort(e.target.value)}
+      />
+      {connectionState === "connected" &&
+        <Button variant="danger" id="button-addon2" onClick={handleDisconnect}> 断开连接 </Button>}
+      {connectionState === "disconnected" &&
+        <Button variant="primary" id="button-addon2" onClick={handleConnect}>连接</Button>}
+      {connectionState === "connecting" &&
+        <Button variant="primary" id="button-addon2" disabled><Spinner animation="border" size="sm" variant="light" /></Button>}
+      {connectionState === "disconnecting" &&
+        <Button variant="primary" id="button-addon2" disabled><Spinner animation="border" size="sm" variant="light" /></Button>}
+    </InputGroup >
+    {/* 接收卡片 */}
+    < ReceiveCard data={receivedData} onBinaryTypeChanged={handleBinaryTypeChanged} />
+    {/* 发送卡片 */}
+    < SendCard onSend={handleSend} />
+  </Container >
+}
+
+const SendCard = (props) => {
+  const _sendDataBuffer = window.localStorage.getItem("websocket-sendDataBuffer") || "[]";
+  const [sendDataBuffer, setSendDataBuffer] = useState(JSON.parse(_sendDataBuffer));
+
+  const updateSendDataBuffer = (buffer) => {
+    window.localStorage.setItem("websocket-sendDataBuffer", JSON.stringify(buffer));
+    setSendDataBuffer(buffer);
   }
 
-  handleSendArrayBufferAddData = (index, type) => {
-    let arrayBufferType = this.state.sendArrayBufferType;
-    let arrayBufferData = this.state.sendArrayBufferData;
-    arrayBufferType[index].push(type);
-    arrayBufferData[index].push(0);
-    window.localStorage.setItem("websocket-sendArrayBufferType", JSON.stringify(arrayBufferType));
-    window.localStorage.setItem("websocket-sendArrayBufferData", JSON.stringify(arrayBufferData));
-    this.setState({
-      sendArrayBufferType: arrayBufferType,
-      sendArrayBufferData: arrayBufferData,
-    });
+  const handleCheckDataPeice = (index, checked) => {
+    console.log(index, checked);
+    let buffer = [...sendDataBuffer];
+    buffer[index].checked = checked;
+    updateSendDataBuffer(buffer);
   }
 
-  handleSendArrayBufferDeleteData = (index) => {
-    console.log("handleSendArrayBufferDeleteData", document.activeElement);
-    let arrayBufferType = this.state.sendArrayBufferType;
-    let arrayBufferData = this.state.sendArrayBufferData;
-    arrayBufferType[index].pop();
-    arrayBufferData[index].pop();
-    window.localStorage.setItem("websocket-sendArrayBufferType", JSON.stringify(arrayBufferType));
-    window.localStorage.setItem("websocket-sendArrayBufferData", JSON.stringify(arrayBufferData));
-    this.setState({
-      sendArrayBufferType: arrayBufferType,
-      sendArrayBufferData: arrayBufferData,
-    });
-  }
-
-  handleSendArrayBufferDataChange = (dataPieceIndex, dataIndex, value) => {
-    console.log("handleSendArrayBufferDataChange", dataPieceIndex, dataIndex, value);
-    let arrayBufferData = this.state.sendArrayBufferData;
-    arrayBufferData[dataPieceIndex][dataIndex] = value;
-    window.localStorage.setItem("websocket-sendArrayBufferData", JSON.stringify(arrayBufferData));
-    this.setState({ sendArrayBufferData: arrayBufferData })
-  }
-
-  handleSendArrayBufferData = (dataIndex) => {
-    console.log("handleSendArrayBufferData", dataIndex);
-    let arrayBufferType = this.state.sendArrayBufferType;
-    let arrayBufferData = this.state.sendArrayBufferData;
-    let arrayBuffer = new ArrayBuffer(arrayBufferType[dataIndex].length);
-    let dataView = new DataView(arrayBuffer);
-    for (let i = 0; i < arrayBufferType[dataIndex].length; i++) {
-      let type = arrayBufferType[dataIndex][i];
-      let data = arrayBufferData[dataIndex][i];
+  const handleAddDataPeice = (type) => {
+    updateSendDataBuffer((buffer) => {
       switch (type) {
-        case "int8": dataView.setInt8(i, data); break;
-        case "uint8": dataView.setUint8(i, data); break;
-        case "int16": dataView.setInt16(i, data); break;
-        case "uint16": dataView.setUint16(i, data); break;
-        case "int32": dataView.setInt32(i, data); break;
-        case "uint32": dataView.setUint32(i, data); break;
-        case "int64": dataView.setBigInt64(i, data); break;
-        case "uint64": dataView.setBigUint64(i, data); break;
-        case "float32": dataView.setFloat32(i, data); break;
-        case "float64": dataView.setFloat64(i, data); break;
+        case "text": buffer.push({ type: "text", data: "", checked: false }); break;
+        case "json": buffer.push({ type: "json", data: {}, checked: false }); break;
+        case "array": buffer.push({ type: "array", data: [], checked: false }); break;
         default: break;
       }
-    }
-    console.log("arrayBuffer", arrayBuffer);
-    window.localStorage.setItem("websocket-sendArrayBufferType", JSON.stringify(this.state.sendArrayBufferType));
-    window.localStorage.setItem("websocket-sendArrayBufferData", JSON.stringify(this.state.sendArrayBufferData));
-    if (this.connectionCheck()) {
-      this.state.ws.send(arrayBuffer);
-    }
-  }
-
-  componentDidMount() {
-    let urlProtocol = window.localStorage.getItem("websocket-urlProtocol") || "ws://";
-    let urlHostname = window.localStorage.getItem("websocket-urlHostname") || "";
-    let urlPort = window.localStorage.getItem("websocket-urlPort") || "";
-    let sendMode = window.localStorage.getItem("websocket-sendMode") || "text";
-    let sendTextBuffer = window.localStorage.getItem("websocket-sendTextBuffer") || "";
-    let sendJSONBuffer = window.localStorage.getItem("websocket-sendJSONBuffer") || "{}";
-    let sendArrayBufferType = window.localStorage.getItem("websocket-sendArrayBufferType") || "[]";
-    let sendArrayBufferData = window.localStorage.getItem("websocket-sendArrayBufferData") || "[]";
-    sendJSONBuffer = JSON.stringify(JSON.parse(sendJSONBuffer), null, 2);
-    this.setState({
-      urlProtocol: urlProtocol,
-      urlHostname: urlHostname,
-      urlPort: urlPort,
-      sendMode: sendMode,
-      sendTextBuffer: sendTextBuffer,
-      sendJSONBuffer: sendJSONBuffer,
-      sendArrayBufferType: JSON.parse(sendArrayBufferType),
-      sendArrayBufferData: JSON.parse(sendArrayBufferData),
+      return buffer;
     });
   }
 
-  render() {
-    return <Container fluid className="websocket" style={{ marginTop: "20px" }}>
-      {/* 连接输入组 */}
-      <InputGroup className="mb-3">
-        <Dropdown
-          onSelect={(e) => this.setState({ urlProtocol: e })}>
-          <DropdownButton
-            variant="outline-secondary"
-            title={this.state.urlProtocol}
-            id="input-group-dropdown-1"
-          >
-            <Dropdown.Item eventKey="ws://">ws://</Dropdown.Item>
-            <Dropdown.Item eventKey="wss://">wss://</Dropdown.Item>
-          </DropdownButton>
+  const handleTextChange = (index, e) => {
+    let buffer = [...sendDataBuffer];
+    buffer[index].data = e.target.value;
+    updateSendDataBuffer(buffer);
+  }
+
+  const handleJSONChange = (index, e) => {
+    let buffer = [...sendDataBuffer];
+    try {
+      buffer[index].data = JSON.parse(e.target.value);
+      updateSendDataBuffer(buffer);
+    } catch (error) {
+      console.log(error);
+    }
+  }
+
+  const handleArrayChange = (index, unitIndex, e) => {
+    let buffer = [...sendDataBuffer];
+    let data = e.target.value;
+    buffer[index].data[unitIndex].data = data;
+    updateSendDataBuffer(buffer);
+  }
+
+  const handleArrayAddUnit = (index, typeIndex) => {
+    let buffer = [...sendDataBuffer];
+    buffer[index].data.push({ typeIndex: typeIndex, data: null, });
+    updateSendDataBuffer(buffer);
+  }
+
+  const handleArrayDeleteUnit = (index, unitIndex) => {
+    let buffer = [...sendDataBuffer];
+    if (unitIndex === undefined) {
+      unitIndex = buffer[index].data.length - 1;
+    }
+    buffer[index].data.splice(unitIndex, 1);
+    updateSendDataBuffer(buffer);
+  }
+
+  const getData = (dataPiece) => {
+    let data;
+    switch (dataPiece.type) {
+      case "text":
+        data = dataPiece.data;
+        return data;
+      case "json":
+        data = JSON.stringify(dataPiece.data);
+        return data;
+      case "array":
+        data = new ArrayBuffer(dataPiece.data.length);
+        let dataView = new DataView(data);
+        for (let i = 0; i < dataPiece.data.length; i++) {
+          let unit = dataPiece.data[i];
+          let typeIndex = unit.typeIndex;
+          let dataType = DataType[typeIndex];
+          dataView[dataType.setFunc](i, unit.data); i += dataType.length - 1;
+        }
+        return data;
+      default:
+        return "";
+    }
+  }
+
+  const getToSendData = () => {
+    let toSendData = "";
+    sendDataBuffer.forEach((dataPiece) => {
+      if (!dataPiece.checked) {
+        return;
+      }
+      switch (dataPiece.type) {
+        case "text": toSendData += dataPiece.data; break;
+        case "json": toSendData += JSON.stringify(dataPiece.data); break;
+        case "array":
+          let datas = [];
+          dataPiece.data.forEach((unit) => {
+            datas.push(unit.data);
+          });
+          toSendData += "[" + datas.join(", ") + "]";
+          break;
+        default: break;
+      }
+    });
+    return toSendData;
+  }
+
+  const handleDeleteDataPiece = (index) => {
+    let buffer = [...sendDataBuffer];
+    buffer.splice(index, 1);
+    updateSendDataBuffer(buffer);
+  }
+
+  const handleMoveDataPiece = (index, direction) => {
+    let buffer = [...sendDataBuffer];
+    let temp = buffer[index];
+    buffer.splice(index, 1);
+    buffer.splice(index + direction, 0, temp);
+    updateSendDataBuffer(buffer);
+  }
+
+  const handleSendPack = () => {
+    sendDataBuffer.forEach((dataPiece) => {
+      if (!dataPiece.checked) {
+        return;
+      }
+      let data = getData(dataPiece);
+      props.onSend(data);
+    });
+  }
+
+  const handleSend = (index) => {
+    let dataPiece = sendDataBuffer[index];
+    let data = getData(dataPiece);
+    props.onSend(data);
+  }
+
+
+  return <Card style={{ marginTop: "20px" }} >
+    <Card.Header as="h5">
+      <Stack direction="horizontal" gap={1}>
+        <h5>发送数据</h5>
+        <Dropdown className="ms-auto" onSelect={handleAddDataPeice}>
+          <Dropdown.Toggle variant="success" id="dropdown-basic">
+            添加条目
+          </Dropdown.Toggle>
+          <Dropdown.Menu>
+            <Dropdown.Item eventKey="text">文本</Dropdown.Item>
+            <Dropdown.Item eventKey="json">JSON</Dropdown.Item>
+            <Dropdown.Item eventKey="array">数组</Dropdown.Item>
+          </Dropdown.Menu>
         </Dropdown>
-        <Form.Control
-          placeholder="ip"
-          aria-label="hostname"
-          aria-describedby="basic-addon1"
-          value={this.state.urlHostname}
-          onChange={(e) => this.setState({ urlHostname: e.target.value })}
-        />
-        <Form.Control
-          placeholder="端口"
-          aria-label="port"
-          aria-describedby="basic-addon1"
-          value={this.state.urlPort}
-          onChange={(e) => this.setState({ urlPort: e.target.value })}
-        />
-        {this.state.connectionState === "connected" &&
-          <Button variant="danger" id="button-addon2" onClick={this.handleDisconnect}>
-            断开连接
-          </Button>}
-        {this.state.connectionState === "disconnected" &&
-          <Button variant="primary" id="button-addon2" onClick={this.handleConnect}>
-            连接
-          </Button>}
-        {this.state.connectionState === "connecting" &&
-          <Button variant="primary" id="button-addon2" disabled>
-            <Spinner animation="border" size="sm" variant="light" />
-          </Button>}
-        {this.state.connectionState === "disconnecting" &&
-          <Button variant="primary" id="button-addon2" disabled>
-            <Spinner animation="border" size="sm" variant="light" />
-          </Button>}
-      </InputGroup>
-      {/* 发送卡片 */}
-      <Card>
-        <Card.Header>
-          <Nav fill variant="tabs" activeKey={this.state.sendMode} onSelect={this.handleModeChange}>
-            <Nav.Item>
-              <Nav.Link eventKey="text">字符串</Nav.Link>
-            </Nav.Item>
-            <Nav.Item>
-              <Nav.Link eventKey="json">JSON</Nav.Link>
-            </Nav.Item>
-            <Nav.Item>
-              <Nav.Link eventKey="arrayBuffer">数组</Nav.Link>
-            </Nav.Item>
-          </Nav></Card.Header>
-        <Card.Body>
-          {this.state.sendMode === "text" && <>
-            <Form.Control as="textarea" rows={3} value={this.state.sendTextBuffer} onChange={(e) => this.setState({ sendTextBuffer: e.target.value })} />
-            <Button onClick={this.handleSendText}>发送</Button>
-          </>}
-          {this.state.sendMode === "json" && <>
-            <Editor height="30vh" defaultLanguage="json" value={this.state.sendJSONBuffer} onChange={(e) => this.setState({ sendJSONBuffer: e })} />
-            <Button onClick={this.handleSendJSON}>发送</Button>
-          </>}
-          {this.state.sendMode === "arrayBuffer" && <>
-            {this.state.sendArrayBufferType.map((dataPiece, dataPieceIndex) => {
-              return <InputGroup className="mb-3" key={dataPieceIndex}>
-                {dataPiece.map((dataType, dataIndex) => {
-                  return <FloatingLabel label={dataType}>
+      </Stack>
+    </Card.Header>
+    {sendDataBuffer.length === 0 && <Card.Body>
+      <Card.Text>请添加条目</Card.Text>
+    </Card.Body>}
+    <ListGroup variant="flush">
+      {sendDataBuffer.map((dataPiece, dataPieceIndex) => {
+        let component = <></>;
+        switch (dataPiece.type) {
+          case "text":
+            component = <Form.Control
+              placeholder="输入需要发送的字符串"
+              as="textarea"
+              rows={3}
+              value={dataPiece.data}
+              onChange={(e) => handleTextChange(dataPieceIndex, e)}
+            />
+            break;
+          case "json":
+            component = <Editor
+              height="10vh"
+              defaultLanguage="json"
+              width="91.8%"
+              value={JSON.stringify(dataPiece.data, null, 2)}
+              onChange={(e) => handleJSONChange(dataPieceIndex, e)}
+            />
+            break;
+          case "array":
+            component = <>
+              {dataPiece.data.length === 0 ?
+                <InputGroup.Text>添加一个数据</InputGroup.Text>
+                : dataPiece.data.map((dataUnit, dataUnitIndex) => {
+                  let type = dataUnit.type;
+                  return <FloatingLabel label={type} key={dataUnitIndex}>
                     <Form.Control
                       className="sendArrayBufferDataInput"
-                      placeholder={dataType}
-                      value={this.state.sendArrayBufferData[dataPieceIndex][dataIndex]}
-                      onChange={(e) => this.handleSendArrayBufferDataChange(dataPieceIndex, dataIndex, e.target.value)}>
+                      placeholder={type}
+                      value={dataUnit.data}
+                      onChange={(e) => handleArrayChange(dataPieceIndex, dataUnitIndex, e)}>
                     </Form.Control>
+                    <CloseButton
+                      onClick={() => handleArrayDeleteUnit(dataPieceIndex, dataUnitIndex)}
+                      style={{
+                        position: "absolute",
+                        right: "0",
+                        top: "0",
+                      }} />
                   </FloatingLabel>
                 })}
-                <Dropdown onSelect={(type) => this.handleSendArrayBufferAddData(dataPieceIndex, type)}>
-                  <DropdownButton
-                    variant="outline-secondary"
-                    title="+"
-                    id="input-group-dropdown-1">
-                    {DataType.map((type, index) => {
-                      return <Dropdown.Item key={index} eventKey={type}>{type}</Dropdown.Item>
-                    })}
-                  </DropdownButton>
-                </Dropdown>
-                <Button variant="danger" onClick={() => this.handleSendArrayBufferDeleteData(dataPieceIndex)}>-</Button>
-                <Button variant="primary" onClick={() => this.handleSendArrayBufferData(dataPieceIndex)}>Send</Button>
-              </InputGroup>
-            })}
-            <Button onClick={this.handleSendArrayBufferAddDataPiece}>添加条目</Button>
-          </>}
+              <Dropdown onSelect={(type) => handleArrayAddUnit(dataPieceIndex, type)}>
+                <DropdownButton
+                  variant="outline-secondary"
+                  title="+"
+                  id="input-group-dropdown-1">
+                  {DataType.map((type, index) => {
+                    return <Dropdown.Item key={index} eventKey={index}>{type.name}</Dropdown.Item>
+                  })}
+                </DropdownButton>
+              </Dropdown>
+            </>
+            break;
+          default: break;
+        }
+        return <ListGroup.Item key={dataPieceIndex}>
+          <InputGroup>
+            {/* 拖拽条目 */}
+            <Form.Check
+              type='checkbox'
+              checked={dataPiece.checked || false}
+              aria-label={dataPieceIndex}
+              onChange={(e) => handleCheckDataPeice(dataPieceIndex, e.target.checked)}
+              style={{ margin: "auto 10px auto 0", fontSize: "x-large" }} />
+            <ButtonGroup vertical size='sm'>
+              <Button variant="outline-secondary" style={{ paddingTop: 0, paddingBottom: 0 }} onClick={() => handleMoveDataPiece(dataPieceIndex, -1)}>
+                <Icon.CaretUpFill className="dragIcon" size={14} />
+              </Button>
+              <Button variant="outline-secondary" style={{ paddingTop: 0, paddingBottom: 0 }} onClick={() => handleMoveDataPiece(dataPieceIndex, 1)}>
+                <Icon.CaretDownFill className="dragIcon" size={14} />
+              </Button>
+            </ButtonGroup>
+            {component}
+            <Button variant="danger" onClick={(e) => handleDeleteDataPiece(dataPieceIndex)}>删除</Button>
+            <Button onClick={handleSend}>发送</Button>
+          </InputGroup>
+        </ListGroup.Item>
+      })}
+      <ListGroup.Item as="li" className="d-flex justify-content-between align-items-start">
+        <span>合并发送数据："{getToSendData()}"</span>
+        <Button onClick={handleSendPack}>发送</Button>
+      </ListGroup.Item>
+    </ListGroup>
+  </Card >
+}
 
-        </Card.Body>
-      </Card>
-      {/* 接收卡片 */}
-      <Card style={{ marginTop: "20px" }}>
-        <Card.Header>接收数据</Card.Header>
-        <Card.Body>
-        </Card.Body>
-      </Card>
-    </Container >
+const ReceiveCard = (props) => {
+  const [binaryType, setBinaryType] = useState(window.localStorage.getItem("webSocket-binaryType") || "arraybuffer");
+
+  const handleBinaryTypeChanged = (e) => {
+    let type = e.currentTarget.value;
+    setBinaryType(type);
+    window.localStorage.setItem("webSocket-binaryType", type);
+    props.onBinaryTypeChanged(type);
   }
+
+  return <Card style={{ marginTop: "20px" }}>
+    <Card.Header as="h5">
+      <Stack direction="horizontal" gap={1}>
+        <h5>接收数据</h5>
+        <ButtonGroup className="ms-auto">
+          {BinaryType.map((type, idx) => (
+            <ToggleButton
+              key={idx}
+              id={`radio-${idx}`}
+              type="radio"
+              variant='outline-primary'
+              name="radio"
+              value={type.id}
+              checked={binaryType === type.id}
+              onChange={handleBinaryTypeChanged}
+            >
+              {type.name}
+            </ToggleButton>
+          ))}
+        </ButtonGroup>
+      </Stack>
+    </Card.Header>
+    {props.data.length === 0 && <Card.Body>
+      <Card.Text>没有数据</Card.Text>
+    </Card.Body>}
+    <ListGroup variant="flush">
+      {props.data.map((data, index) => {
+        console.log(data);
+        let component;
+        if (typeof data === "string") {
+          try {
+            data = JSON.parse(data);
+            component = <Editor
+              key={index}
+              height="10vh"
+              defaultLanguage="json"
+              width="91.8%"
+              value={JSON.stringify(data, null, 2)}
+            />
+          } catch (e) {
+            component = <Card.Text key={index}>{data}</Card.Text>
+          }
+        } else if (typeof data === "arraybuffer") {
+          component = <Card.Text key={index}>{data}</Card.Text>
+        }
+        return <ListGroup.Item>{component}</ListGroup.Item>
+      })}
+    </ListGroup>
+  </Card >
 }
 
 export default Websocket;

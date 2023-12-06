@@ -4,6 +4,8 @@ import Toast from '../toast.jsx';
 
 import './Main.css';
 
+const HOME = '/almost-toolbox';
+
 class Main extends React.Component {
   constructor(props) {
     super(props);
@@ -11,30 +13,25 @@ class Main extends React.Component {
       toastOpen: false,
       toastTitle: '',
       toastMessage: '',
-      currentTool: 'websocket',
     };
+
+    let tool = window.location.pathname.replace(HOME, '').replace('/', '');
+    if (tool === '') {
+      tool = window.localStorage.getItem('main-currentTool') || 'websocket';
+      this.navigateTo(tool);
+    } else {
+      this.currentTool = tool;
+    }
   }
 
-  componentDidMount() {
-    let path = window.location.pathname;
-    path = path.replace('/', '');
-    console.log("Path:", path);
-    let currentTool = '';
-    if (path === '') {
-      currentTool = window.localStorage.getItem('main-currentTool') || 'websocket';
-    } else {
-      currentTool = path;
-    }
-    this.setState({
-      currentTool: currentTool
-    });
+  navigateTo = (tool) => {
+    let newUrl = window.location.origin + HOME + '/' + tool;
+    window.location.href = newUrl;
   }
 
   handleTabSelect = (tool) => {
     window.localStorage.setItem('main-currentTool', tool);
-    this.setState({
-      currentTool: tool
-    });
+    this.navigateTo(tool);
   }
 
   handleToastOpen = (title, message, dismiss = 5) => {
@@ -58,13 +55,17 @@ class Main extends React.Component {
   }
 
   render() {
-    let avaliableTools = this.props.tools.map((tool) => tool.path);
-
+    let toolComponent = <h3>没有这个工具：{this.currentTool}</h3>;
+    this.props.tools.forEach((tool, index) => {
+      if (tool.path === this.currentTool) {
+        toolComponent = <tool.component key={index} toast={this.handleToastOpen} />;
+      }
+    });
     return <div className="main">
       <Navbar className="main-navbar" bg="primary" data-bs-theme="dark">
         <Container>
-          <Navbar.Brand href="/home">工具箱</Navbar.Brand>
-          <Nav className="me-auto" activeKey={this.state.currentTool} onSelect={this.handleTabSelect}>
+          <Navbar.Brand href="/home">差不多工具箱</Navbar.Brand>
+          <Nav className="me-auto" activeKey={this.currentTool} onSelect={this.handleTabSelect}>
             {this.props.tools.map((tool, index) =>
               <Nav.Link key={index} eventKey={tool.path}>{tool.name}</Nav.Link>
             )}
@@ -72,13 +73,7 @@ class Main extends React.Component {
         </Container>
       </Navbar>
       <div className="content">
-        {avaliableTools.indexOf(this.state.currentTool) === -1 ?
-          <h3>没有这个工具：{this.state.currentTool}</h3> :
-          this.props.tools.map((tool, index) => {
-            if (tool.path === this.state.currentTool) {
-              return <tool.component key={index} toast={this.handleToastOpen} />
-            }
-          })}
+        {toolComponent}
       </div>
       <Toast
         open={this.state.toastOpen}
