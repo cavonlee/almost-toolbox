@@ -11,6 +11,7 @@
   position: fixed !important;
   width: 100%;
   z-index: 999;
+  -webkit-app-region: drag;
 }
 
 .toolbar {

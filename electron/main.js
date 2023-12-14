@@ -12,6 +12,7 @@ let serialDeviceSelected = null;
 
 const createWindow = () => {
   const mainWindow = new BrowserWindow({
+    frame: false,
     width: 1280,
     height: 800,
     webPreferences: {

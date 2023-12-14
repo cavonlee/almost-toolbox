@@ -1,4 +1,6 @@
-import React from "react";
+import React, {
+  useState,
+} from "react";
 import {
   Card,
   Container,
@@ -9,9 +11,12 @@ import {
   Form,
   Button,
   InputGroup,
+  Dropdown,
+  DropdownButton,
+  Stack,
 } from 'react-bootstrap';
 import resisterDividerSchematic from '../assets/schematic.jpg';
-import { round, value2Number, number2Value } from '../js/utils.js';
+import { roundString, value2Number, number2Value } from '../js/utils.js';
 
 import './ResisterDivider.css';
 
@@ -86,41 +91,26 @@ const ResistorList = {
   ]
 }
 
-class ResisterDivider extends React.Component {
-  constructor(props) {
-    super(props);
-    this.state = {
-      resistorSeries: 24, // E24
-      resistorPrecision: 1, // 0.1%, 0.5%, 1%, 5%, 10%, etc.
-      inR1: "",
-      inR2: "",
-      inVin: "",
-      inVout: "",
-      outputTitle: "",
-    };
-  }
+const ResisterDivider = (props) => {
+  let _series = Number(window.localStorage.getItem("resistorDivider-resistorSeries") || 24);
+  let _precision = Number(window.localStorage.getItem("resistorDivider-resistorPrecision") || 1);
+  let _calculateAcuracy = Number(window.localStorage.getItem("resistorDivider-calculateAcuracy") || 2);
+  let _inR1 = window.localStorage.getItem("resistorDivider-inR1") || "";
+  let _inR2 = window.localStorage.getItem("resistorDivider-inR2") || "";
+  let _inVin = window.localStorage.getItem("resistorDivider-inVin") || "";
+  let _inVout = window.localStorage.getItem("resistorDivider-inVout") || "";
+  const [resistorSeries, setResistorSeries] = useState(_series);
+  const [resistorPrecision, setResistorPrecision] = useState(_precision);
+  const [calculateAcuracy, setCalculateAcuracy] = useState(_calculateAcuracy);
+  const [inR1, setInR1] = useState(_inR1);
+  const [inR2, setInR2] = useState(_inR2);
+  const [inVin, setInVin] = useState(_inVin);
+  const [inVout, setInVout] = useState(_inVout);
+  const [outputTitle, setOutputTitle] = useState("");
+  const [result, setResult] = useState({});
 
-  componentDidMount() {
-    let series = Number(window.localStorage.getItem("resistorDivider-resistorSeries") || 24);
-    let precision = Number(window.localStorage.getItem("resistorDivider-resistorPrecision") || 1);
-    let inR1 = window.localStorage.getItem("resistorDivider-inR1") || "";
-    let inR2 = window.localStorage.getItem("resistorDivider-inR2") || "";
-    let inVin = window.localStorage.getItem("resistorDivider-inVin") || "";
-    let inVout = window.localStorage.getItem("resistorDivider-inVout") || "";
-    this.setState({
-      resistorSeries: series,
-      resistorPrecision: precision,
-      inR1: inR1,
-      inR2: inR2,
-      inVin: inVin,
-      inVout: inVout,
-      result: {},
-    });
-  }
-
-  renderResistorTable = () => {
-    let series = this.state.resistorSeries
-    let resistorList = ResistorList[series];
+  const renderResistorTable = () => {
+    let resistorList = ResistorList[resistorSeries];
     if (!resistorList) return null;
     let rows = [];
     let colLength = 12;
@@ -135,7 +125,7 @@ class ResisterDivider extends React.Component {
     return (
       <Card style={{ marginTop: "20px" }}>
         <Card.Header>
-          电阻表 E{series}
+          电阻表 E{resistorSeries}
         </Card.Header>
         <Card.Body>
           <Table striped bordered hover>
@@ -148,21 +138,26 @@ class ResisterDivider extends React.Component {
     );
   }
 
-  handleSeriesChange = (e) => {
+  const handleSeriesChange = (e) => {
     let series = e.target.value;
     window.localStorage.setItem("resistorDivider-resistorSeries", series);
-    this.setState({ resistorSeries: series });
+    setResistorSeries(series);
   }
 
-  handlePrecisionChange = (e) => {
+  const handlePrecisionChange = (e) => {
     let precision = e.target.value;
     window.localStorage.setItem("resistorDivider-resistorPrecision", precision);
-    this.setState({ resistorPrecision: precision });
+    setResistorPrecision(precision);
   }
 
-  getStandardResistor = (value) => {
-    let series = this.state.resistorSeries
-    let resistorList = ResistorList[series];
+  const handleCalculateAcuracyChange = (eventKey) => {
+    let acuracy = eventKey;
+    window.localStorage.setItem("resistorDivider-calculateAcuracy", acuracy);
+    setCalculateAcuracy(acuracy, handleCalculate);
+  }
+
+  const getStandardResistor = (value) => {
+    let resistorList = ResistorList[resistorSeries];
     let minError = 100000000;
     let minErrorIndex = 0;
     for (let i = 0; i < resistorList.length; i++) {
@@ -179,179 +174,169 @@ class ResisterDivider extends React.Component {
     return result;
   }
 
-  handleCalculateError = (messge) => {
-    this.setState({
-      outputTitle: messge,
-      result: {},
-    });
+  const handleCalculateError = (messge) => {
+    setOutputTitle(messge);
+    setResult({});
   }
 
-  handleCalculate = () => {
-    let inR1 = value2Number(this.state.inR1);
-    let inR2 = value2Number(this.state.inR2);
-    let inVin = value2Number(this.state.inVin);
-    let inVout = value2Number(this.state.inVout);
-    window.localStorage.setItem("resistorDivider-inR1", this.state.inR1);
-    window.localStorage.setItem("resistorDivider-inR2", this.state.inR2);
-    window.localStorage.setItem("resistorDivider-inVin", this.state.inVin);
-    window.localStorage.setItem("resistorDivider-inVout", this.state.inVout);
-    if (inR1 === "" && inR2 !== "" && inVin !== "" && inVout !== "") {
-      this.calculateR1();
-    } else if (inR1 !== "" && inR2 === "" && inVin !== "" && inVout !== "") {
-      this.calculateR2();
-    } else if (inR1 !== "" && inR2 !== "" && inVin === "" && inVout !== "") {
-      this.calculateVin();
-    } else if (inR1 !== "" && inR2 !== "" && inVin !== "" && inVout === "") {
-      this.calculateVout();
-    } else if (inR1 === "" && inR2 === "" && inVin !== "" && inVout !== "") {
-      this.calculateR1R2();
-    } else if (inR1 !== "" && inR2 !== "" && inVin !== "" && inVout !== "") {
-      this.handleCalculateError("你什么都有了， 那。。。我算什么？");
-    } else if (inR1 === "" && inR2 === "" && inVin === "" && inVout === "") {
-      this.handleCalculateError("你什么都没有，怎么算？");
-    } else if (inR1 !== "" && inR2 === "" && inVin === "" && inVout === "") {
-      this.handleCalculateError("只有R1，怎么算？");
-    } else if (inR1 === "" && inR2 !== "" && inVin === "" && inVout === "") {
-      this.handleCalculateError("只有R2，怎么算？");
-    } else if (inR1 === "" && inR2 === "" && inVin !== "" && inVout === "") {
-      this.handleCalculateError("只有VIN，怎么算？");
-    } else if (inR1 === "" && inR2 === "" && inVin === "" && inVout !== "") {
-      this.handleCalculateError("只有VOUT，怎么算？");
+  const handleCalculate = () => {
+    let r1 = value2Number(inR1);
+    let r2 = value2Number(inR2);
+    let vin = value2Number(inVin);
+    let vout = value2Number(inVout);
+    if (r1 === "" && r2 !== "" && vin !== "" && vout !== "") {
+      calculateR1();
+    } else if (r1 !== "" && r2 === "" && vin !== "" && vout !== "") {
+      calculateR2();
+    } else if (r1 !== "" && r2 !== "" && vin === "" && vout !== "") {
+      calculateVin();
+    } else if (r1 !== "" && r2 !== "" && vin !== "" && vout === "") {
+      calculateVout();
+    } else if (r1 === "" && r2 === "" && vin !== "" && vout !== "") {
+      calculateR1R2();
+    } else if (r1 !== "" && r2 !== "" && vin !== "" && vout !== "") {
+      handleCalculateError("你什么都有了， 那。。。我算什么？");
+    } else if (r1 === "" && r2 === "" && vin === "" && vout === "") {
+      handleCalculateError("你什么都没有，怎么算？");
+    } else if (r1 !== "" && r2 === "" && vin === "" && vout === "") {
+      handleCalculateError("只有R1，怎么算？");
+    } else if (r1 === "" && r2 !== "" && vin === "" && vout === "") {
+      handleCalculateError("只有R2，怎么算？");
+    } else if (r1 === "" && r2 === "" && vin !== "" && vout === "") {
+      handleCalculateError("只有VIN，怎么算？");
+    } else if (r1 === "" && r2 === "" && vin === "" && vout !== "") {
+      handleCalculateError("只有VOUT，怎么算？");
     }
   }
 
-  calculateR1 = () => {
+  const calculateR1 = () => {
     let result = {};
-    let inR2 = value2Number(this.state.inR2);
-    let inVin = value2Number(this.state.inVin);
-    let inVout = value2Number(this.state.inVout);
-    let outR1 = inVin / inVout * inR2 - inR2;
-    result["直接结果"] = [outR1, inR2, inVin, inVout, "0%"];
+    let _inR2 = value2Number(inR2);
+    let _inVin = value2Number(inVin);
+    let _inVout = value2Number(inVout);
+    let outR1 = _inVin / _inVout * _inR2 - _inR2;
+    result["直接结果"] = [outR1, _inR2, _inVin, _inVout, "0%"];
 
-    let standardR1 = this.getStandardResistor(outR1);
+    let standardR1 = getStandardResistor(outR1);
 
     // 锁定Vin 计算标准R1下的Vout，得出误差
-    let lockVinVout = inVin * inR2 / (standardR1 + inR2);
-    let lockVinError = (lockVinVout - inVout) / inVout * 100;
-    lockVinError = round(lockVinError, 2);
+    let lockVinVout = _inVin * _inR2 / (standardR1 + _inR2);
+    let lockVinError = (lockVinVout - _inVout) / _inVout * 100;
+    lockVinError = roundString(lockVinError, calculateAcuracy);
     lockVinError = lockVinError + "%";
-    result["锁定Vin"] = [standardR1, inR2, inVin, lockVinVout, lockVinError];
+    result["锁定Vin"] = [standardR1, _inR2, _inVin, lockVinVout, lockVinError];
 
     // 锁定Vout 计算标准R1下的Vin，得出误差
-    let lockVoutVin = inVout * (standardR1 + inR2) / inR2
-    let lockVoutError = (lockVoutVin - inVin) / inVin * 100;
-    lockVoutError = round(lockVoutError, 2);
+    let lockVoutVin = _inVout * (standardR1 + _inR2) / _inR2
+    let lockVoutError = (lockVoutVin - _inVin) / _inVin * 100;
+    lockVoutError = roundString(lockVoutError, calculateAcuracy);
     lockVoutError = lockVoutError + "%";
-    result["锁定Vout"] = [standardR1, inR2, lockVoutVin, inVout, lockVoutError];
+    result["锁定Vout"] = [standardR1, _inR2, lockVoutVin, _inVout, lockVoutError];
 
-    this.setState({
-      outputTitle: "计算R1:",
-      result: result,
-    });
+    setOutputTitle("计算R1:");
+    setResult(result);
   }
 
-  calculateR2 = () => {
+  const calculateR2 = () => {
     let result = {};
-    let inR1 = value2Number(this.state.inR1);
-    let inVin = value2Number(this.state.inVin);
-    let inVout = value2Number(this.state.inVout);
-    let outR2 = inR1 * inVout / (inVin - inVout);
-    result["直接结果"] = [inR1, outR2, inVin, inVout, "0%"];
+    let _inR1 = value2Number(inR1);
+    let _inVin = value2Number(inVin);
+    let _inVout = value2Number(inVout);
+    let outR2 = _inR1 * _inVout / (_inVin - _inVout);
+    result["直接结果"] = [_inR1, outR2, _inVin, _inVout, "0%"];
 
     // 获取标准电阻
-    let standardR2 = this.getStandardResistor(outR2);
+    let standardR2 = getStandardResistor(outR2);
 
     // 锁定Vin 计算标准R2下的Vout，得出误差
-    let lockVinVout = inVin * standardR2 / (inR1 + standardR2);
-    let lockVinError = (lockVinVout - inVout) / inVout * 100;
-    lockVinError = round(lockVinError, 2);
+    let lockVinVout = _inVin * standardR2 / (_inR1 + standardR2);
+    let lockVinError = (lockVinVout - _inVout) / _inVout * 100;
+    lockVinError = roundString(lockVinError, calculateAcuracy);
     lockVinError = lockVinError + "%";
-    result["锁定Vin"] = [inR1, standardR2, inVin, lockVinVout, lockVinError];
+    result["锁定Vin"] = [_inR1, standardR2, _inVin, lockVinVout, lockVinError];
 
     // 锁定Vout 计算标准R2下的Vin，得出误差
-    let lockVoutVin = inVout * (inR1 + standardR2) / standardR2
-    let lockVoutError = (lockVoutVin - inVout) / inVout * 100;
-    lockVoutError = round(lockVoutError, 2);
+    let lockVoutVin = _inVout * (_inR1 + standardR2) / standardR2
+    let lockVoutError = (lockVoutVin - _inVout) / _inVout * 100;
+    lockVoutError = roundString(lockVoutError, calculateAcuracy);
     lockVoutError = lockVoutError + "%";
-    result["锁定Vout"] = [inR1, standardR2, lockVoutVin, inVout, lockVoutError];
+    result["锁定Vout"] = [_inR1, standardR2, lockVoutVin, _inVout, lockVoutError];
 
-    this.setState({
-      outputTitle: "计算R2:",
-      result: result,
-    });
+    setOutputTitle("计算R2:");
+    setResult(result);
   }
 
-  calculateVin = () => {
-    console.log("calculateVin");
-    let r1 = value2Number(this.state.inR1);
-    let r2 = value2Number(this.state.inR2);
-    let vout = value2Number(this.state.inVout);
+  const calculateVin = () => {
+    let r1 = value2Number(inR1);
+    let r2 = value2Number(inR2);
+    let vout = value2Number(inVout);
     let vin = vout * (r1 + r2) / r2
-    let precision = this.state.resistorPrecision;
-    let r1Min = r1 * (1 - precision / 100);
-    let r1Max = r1 * (1 + precision / 100);
-    let r2Min = r2 * (1 - precision / 100);
-    let r2Max = r2 * (1 + precision / 100);
+    let r1Min = r1 * (1 - resistorPrecision / 100);
+    let r1Max = r1 * (1 + resistorPrecision / 100);
+    let r2Min = r2 * (1 - resistorPrecision / 100);
+    let r2Max = r2 * (1 + resistorPrecision / 100);
     let vinList = [];
     vinList.push(vout * (r1Min + r2Min) / r2Min);
     vinList.push(vout * (r1Min + r2Max) / r2Max);
     vinList.push(vout * (r1Max + r2Min) / r2Min);
     vinList.push(vout * (r1Max + r2Max) / r2Max);
-    let vinMin = round(Math.min(...vinList), 2);
-    let vinMax = round(Math.max(...vinList), 2);
-    let errorRate = round((vinMax - vinMin) / vinMax * 100, 2);
+    let vinMin = Math.min(...vinList);
+    let vinMax = Math.max(...vinList);
+    let errorRate = (vinMax - vinMin) / vinMax * 100;
     r1Min = number2Value(r1Min);
     r1Max = number2Value(r1Max);
     r2Min = number2Value(r2Min);
     r2Max = number2Value(r2Max);
+    vinMin = roundString(vinMin, calculateAcuracy);
+    vinMax = roundString(vinMax, calculateAcuracy);
+    errorRate = roundString(errorRate, calculateAcuracy);
     let result = {
       "直接结果": [r1, r2, vin, vout, "0%"],
       "误差范围": [`${r1Min} ~ ${r1Max}`, `${r2Min} ~ ${r2Max}`, `${vinMin} ~ ${vinMax}`, vout, errorRate + '%'],
     }
-    this.setState({
-      outputTitle: "计算Vin:",
-      result: result,
-    });
+    setOutputTitle("计算Vin:");
+    setResult(result);
   }
 
-  calculateVout = () => {
-    let r1 = value2Number(this.state.inR1);
-    let r2 = value2Number(this.state.inR2);
-    let vin = value2Number(this.state.inVin);
+  const calculateVout = () => {
+    console.log("calculateVout");
+    let result = {};
+    let r1 = value2Number(inR1);
+    let r2 = value2Number(inR2);
+    let vin = value2Number(inVin);
     let vout = vin * r2 / (r1 + r2);
-    vout = round(vout, 2);
+    vout = roundString(vout, calculateAcuracy);
+    result["直接结果"] = [r1, r2, vin, vout, "0%"];
 
-    let precision = this.state.resistorPrecision;
-    let r1Min = r1 * (1 - precision / 100);
-    let r1Max = r1 * (1 + precision / 100);
-    let r2Min = r2 * (1 - precision / 100);
-    let r2Max = r2 * (1 + precision / 100);
+    let r1Min = r1 * (1 - resistorPrecision / 100);
+    let r1Max = r1 * (1 + resistorPrecision / 100);
+    let r2Min = r2 * (1 - resistorPrecision / 100);
+    let r2Max = r2 * (1 + resistorPrecision / 100);
     let voutList = [];
     voutList.push(vin * r2Min / (r1Min + r2Min));
     voutList.push(vin * r2Min / (r1Max + r2Min));
     voutList.push(vin * r2Max / (r1Min + r2Max));
     voutList.push(vin * r2Max / (r1Max + r2Max));
-    let voutMin = round(Math.min(...voutList), 2);
-    let voutMax = round(Math.max(...voutList), 2);
-    let errorRate = round((voutMax - voutMin) / voutMin * 100, 2);
+    let voutMin = Math.min(...voutList);
+    let voutMax = Math.max(...voutList);
+    let errorRate = (voutMax - voutMin) / voutMin * 100;
     r1Min = number2Value(r1Min);
     r1Max = number2Value(r1Max);
     r2Min = number2Value(r2Min);
     r2Max = number2Value(r2Max);
-    let result = {
-      "直接结果": [r1, r2, vin, vout, "0%"],
-      "误差范围": [`${r1Min} ~ ${r1Max}`, `${r2Min} ~ ${r2Max}`, vin, `${voutMin} ~ ${voutMax}`, errorRate + '%'],
-    }
-    this.setState({
-      outputTitle: "计算Vout:",
-      result: result,
-    });
+    voutMin = roundString(voutMin, calculateAcuracy);
+    voutMax = roundString(voutMax, calculateAcuracy);
+    errorRate = roundString(errorRate, calculateAcuracy);
+    result["误差范围"] = [`${r1Min} ~ ${r1Max}`, `${r2Min} ~ ${r2Max}`, vin, `${voutMin} ~ ${voutMax}`, errorRate + '%'];
+
+    setOutputTitle("计算Vout:");
+    setResult(result);
   }
 
-  calculateR1R2 = () => {
-    let inVin = value2Number(this.state.inVin);
-    let inVout = value2Number(this.state.inVout);
-    let resistorList = ResistorList[this.state.resistorSeries];
+  const calculateR1R2 = () => {
+    let vin = value2Number(inVin);
+    let vout = value2Number(inVout);
+    let resistorList = ResistorList[resistorSeries];
     let minimalError = Infinity;
     let outR1, outR2;
     for (let i = 0; i < resistorList.length; i++) {
@@ -360,8 +345,8 @@ class ResisterDivider extends React.Component {
         let _r2 = resistorList[j];
         _r1 = value2Number(_r1);
         _r2 = value2Number(_r2);
-        let _vout = inVin * _r2 / (_r1 + _r2);
-        let error = _vout - inVout;
+        let _vout = vin * _r2 / (_r1 + _r2);
+        let error = _vout - vout;
         error = Math.abs(error);
         if (error < minimalError) {
           outR1 = _r1;
@@ -371,48 +356,69 @@ class ResisterDivider extends React.Component {
         }
       }
     }
-    let actualVout = round(inVin * outR2 / (outR1 + outR2), 2);
-    let actualVoutError = round((actualVout - inVout) / inVout * 100, 2) + "%";
-    let actualVin = round(inVout * (outR1 + outR2) / outR2, 2);
-    let actualVinError = round((actualVin - inVin) / inVin * 100, 2) + "%";
+    let actualVout = roundString(vin * outR2 / (outR1 + outR2), calculateAcuracy);
+    let actualVoutError = roundString((actualVout - vout) / vout * 100, calculateAcuracy) + "%";
+    let actualVin = roundString(vout * (outR1 + outR2) / outR2, calculateAcuracy);
+    let actualVinError = roundString((actualVin - vin) / vin * 100, calculateAcuracy) + "%";
     let result = {
       "直接结果": [outR1, outR2, "-", "-", "0%"],
-      "以Vin为准Vout实际结果": [outR1, outR2, inVin, actualVout, actualVoutError],
-      "以Vout为准Vin实际结果": [outR1, outR2, actualVin, inVout, actualVinError],
+      "以Vin为准Vout实际结果": [outR1, outR2, vin, actualVout, actualVoutError],
+      "以Vout为准Vin实际结果": [outR1, outR2, actualVin, vout, actualVinError],
     }
-    this.setState({
-      outputTitle: "计算R1和R2:",
-      result: result,
-    });
+
+    setOutputTitle("计算R1和R2:");
+    setResult(result);
   }
 
-  handleR1Change = (event) => {
-    this.setState({ inR1: event.target.value }, this.handleCalculate);
+  const handleR1Change = (event) => {
+    window.localStorage.setItem("resistorDivider-inR1", event.target.value);
+    setInR1(event.target.value, this.handleCalculate);
   }
 
-  handleR2Change = (event) => {
-    this.setState({ inR2: event.target.value }, this.handleCalculate);
+  const handleR2Change = (event) => {
+    window.localStorage.setItem("resistorDivider-inR2", event.target.value);
+    setInR2(event.target.value, this.handleCalculate);
   }
 
-  handleVinChange = (event) => {
-    this.setState({ inVin: event.target.value }, this.handleCalculate);
+  const handleVinChange = (event) => {
+    window.localStorage.setItem("resistorDivider-inVin", event.target.value);
+    setInVin(event.target.value, this.handleCalculate);
   }
 
-  handleVoutChange = (event) => {
-    this.setState({ inVout: event.target.value }, this.handleCalculate);
+  const handleVoutChange = (event) => {
+    window.localStorage.setItem("resistorDivider-inVout", event.target.value);
+    setInVout(event.target.value, this.handleCalculate);
   }
 
-  renderResult = () => {
-    if (this.state.outputTitle === "") {
+  const renderResult = () => {
+    if (outputTitle === "") {
       return <div></div>
     }
 
     return <div>
-      <h5 style={{ textAlign: "justify", margin: "20px 0" }}>
-        {this.state.outputTitle}
-      </h5>
+      <Stack direction="horizontal" gap={1}>
+        <h5 style={{ textAlign: "justify", margin: "20px 0" }}>
+          {outputTitle}
+        </h5>
+        <DropdownButton
+          id="dropdown-basic-button"
+          title={`计算精度：${calculateAcuracy}位`}
+          variant="outline-secondary"
+          size="sm"
+          className="ms-auto"
+          onSelect={handleCalculateAcuracyChange}
+        >
+          <Dropdown.Item eventKey="0">0</Dropdown.Item>
+          <Dropdown.Item eventKey="1">1</Dropdown.Item>
+          <Dropdown.Item eventKey="2">2</Dropdown.Item>
+          <Dropdown.Item eventKey="3">3</Dropdown.Item>
+          <Dropdown.Item eventKey="4">4</Dropdown.Item>
+          <Dropdown.Item eventKey="5">5</Dropdown.Item>
+          <Dropdown.Item eventKey="6">6</Dropdown.Item>
+        </DropdownButton>
+      </Stack>
 
-      {Object.keys(this.state.result).length !== 0 && <Table striped bordered hover>
+      {Object.keys(result).length !== 0 && <Table striped bordered hover>
         <thead>
           <tr>
             <th></th>
@@ -424,10 +430,10 @@ class ResisterDivider extends React.Component {
           </tr>
         </thead>
         <tbody>
-          {Object.keys(this.state.result).map((key, index) => {
+          {Object.keys(result).map((key, index) => {
             return <tr key={index}>
               <td>{key}</td>
-              {this.state.result[key].map((item, index) => {
+              {result[key].map((item, index) => {
                 return <td key={index}>{number2Value(item)}</td>
               })}
             </tr>
@@ -437,67 +443,65 @@ class ResisterDivider extends React.Component {
     </div>
   }
 
-  render() {
-    return <Container className="resister-divider">
-      <Card>
-        <Card.Header style={{ display: "flex", alignItems: "center", justifyContent: "center" }}>
-          电阻分压计算
-        </Card.Header>
-        <Card.Body>
-          <Row>
-            <Col sm={2} className="resister-divider-schematic-image-container">
-              <img className="resister-divider-schematic-image" src={resisterDividerSchematic} alt="resistor-divider" />
-            </Col>
-            <Col style={{ marginLeft: "20px" }}>
-              <h5 style={{ textAlign: "justify", margin: "20px 0" }}>
-                输入下面部分参数，点击计算，即可计算出其他参数
-              </h5>
-              <Row>
-                <Col sm={2}>
-                  <FloatingLabel controlId="floatingSelect" label="电阻系列">
-                    <Form.Select value={this.state.resistorSeries} onChange={this.handleSeriesChange}>
-                      {Object.keys(ResistorList).map((key, index) => {
-                        return <option key={index} value={key}>E{key}</option>
-                      })}
-                    </Form.Select>
+  return <Container className="resister-divider">
+    <Card>
+      <Card.Header style={{ display: "flex", alignItems: "center", justifyContent: "center" }}>
+        电阻分压计算
+      </Card.Header>
+      <Card.Body>
+        <Row>
+          <Col sm={2} className="resister-divider-schematic-image-container">
+            <img className="resister-divider-schematic-image" src={resisterDividerSchematic} alt="resistor-divider" />
+          </Col>
+          <Col style={{ marginLeft: "20px" }}>
+            <h5 style={{ textAlign: "justify", margin: "20px 0" }}>
+              输入下面部分参数，点击计算，即可计算出其他参数
+            </h5>
+            <Row>
+              <Col sm={2}>
+                <FloatingLabel controlId="floatingSelect" label="电阻系列">
+                  <Form.Select value={resistorSeries} onChange={handleSeriesChange}>
+                    {Object.keys(ResistorList).map((key, index) => {
+                      return <option key={index} value={key}>E{key}</option>
+                    })}
+                  </Form.Select>
+                </FloatingLabel>
+              </Col>
+              <Col sm={2}>
+                <FloatingLabel controlId="floatingSelect" label="电阻精度">
+                  <Form.Select value={resistorPrecision} onChange={handlePrecisionChange}>
+                    {PrecisionList.map((item, index) => {
+                      return <option key={index} value={item}>{item}%</option>
+                    })}
+                  </Form.Select>
+                </FloatingLabel>
+              </Col>
+              <Col>
+                <InputGroup>
+                  <FloatingLabel label="R1">
+                    <Form.Control value={inR1} onChange={handleR1Change} />
                   </FloatingLabel>
-                </Col>
-                <Col sm={2}>
-                  <FloatingLabel controlId="floatingSelect" label="电阻精度">
-                    <Form.Select value={this.state.resistorPrecision} onChange={this.handlePrecisionChange}>
-                      {PrecisionList.map((item, index) => {
-                        return <option key={index} value={item}>{item}%</option>
-                      })}
-                    </Form.Select>
+                  <FloatingLabel label="R2">
+                    <Form.Control value={inR2} onChange={handleR2Change} />
                   </FloatingLabel>
-                </Col>
-                <Col>
-                  <InputGroup>
-                    <FloatingLabel label="R1">
-                      <Form.Control value={this.state.inR1} onChange={this.handleR1Change} />
-                    </FloatingLabel>
-                    <FloatingLabel label="R2">
-                      <Form.Control value={this.state.inR2} onChange={this.handleR2Change} />
-                    </FloatingLabel>
-                    <FloatingLabel label="VIN">
-                      <Form.Control value={this.state.inVin} onChange={this.handleVinChange} />
-                    </FloatingLabel>
-                    <FloatingLabel label="VOUT">
-                      <Form.Control value={this.state.inVout} onChange={this.handleVoutChange} />
-                    </FloatingLabel>
-                    <Button variant="primary" onClick={this.handleCalculate}>计算</Button>
-                  </InputGroup>
-                </Col>
-              </Row>
-              {this.renderResult()}
-            </Col>
-          </Row>
-        </Card.Body>
-      </Card >
+                  <FloatingLabel label="VIN">
+                    <Form.Control value={inVin} onChange={handleVinChange} />
+                  </FloatingLabel>
+                  <FloatingLabel label="VOUT">
+                    <Form.Control value={inVout} onChange={handleVoutChange} />
+                  </FloatingLabel>
+                  <Button variant="primary" onClick={handleCalculate}>计算</Button>
+                </InputGroup>
+              </Col>
+            </Row>
+            {renderResult()}
+          </Col>
+        </Row>
+      </Card.Body>
+    </Card >
 
-      {this.renderResistorTable()}
-    </Container >
-  }
+    {renderResistorTable()}
+  </Container >
 }
 
 export default ResisterDivider;
