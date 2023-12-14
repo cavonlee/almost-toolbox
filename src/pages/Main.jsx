@@ -1,10 +1,9 @@
 import React from "react";
-import { Navbar, Nav, Container } from 'react-bootstrap';
+import { Navbar, Nav, CloseButton, Button } from 'react-bootstrap';
+import ReflashButton from "../components/ReflashButton.jsx";
 import Toast from '../toast.jsx';
 
 import './Main.css';
-
-const HOME = '/almost-toolbox';
 
 class Main extends React.Component {
   constructor(props) {
@@ -15,7 +14,7 @@ class Main extends React.Component {
       toastMessage: '',
     };
 
-    let tool = window.location.pathname.replace(HOME, '').replace('/', '');
+    let tool = window.location.pathname.replace('/', '');
     if (tool === '') {
       tool = window.localStorage.getItem('main-currentTool') || 'websocket';
       this.navigateTo(tool);
@@ -25,7 +24,7 @@ class Main extends React.Component {
   }
 
   navigateTo = (tool) => {
-    let newUrl = window.location.origin + HOME + '/' + tool;
+    let newUrl = window.location.origin + '/' + tool;
     window.location.href = newUrl;
   }
 
@@ -62,15 +61,15 @@ class Main extends React.Component {
       }
     });
     return <div className="main">
-      <Navbar className="main-navbar" bg="primary" data-bs-theme="dark">
-        <Container>
-          <Navbar.Brand href="/home">差不多工具箱</Navbar.Brand>
-          <Nav className="me-auto" activeKey={this.currentTool} onSelect={this.handleTabSelect}>
-            {this.props.tools.map((tool, index) =>
-              <Nav.Link key={index} eventKey={tool.path}>{tool.name}</Nav.Link>
-            )}
-          </Nav>
-        </Container>
+      <Navbar className="main-navbar" bg="primary" data-bs-theme="dark" style={{ paddingLeft: "20px", paddingRight: "20px" }}>
+        <Navbar.Brand href="/home">差不多工具箱</Navbar.Brand>
+        <Nav className="me-auto" activeKey={this.currentTool} onSelect={this.handleTabSelect}>
+          {this.props.tools.map((tool, index) =>
+            <Nav.Link key={index} eventKey={tool.path}>{tool.name}</Nav.Link>
+          )}
+        </Nav>
+        <ReflashButton onClick={() => window.location.reload()} />
+        <CloseButton onClick={() => window.close()} />
       </Navbar>
       <div className="content">
         {toolComponent}

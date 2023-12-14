@@ -221,18 +221,29 @@ class ResisterDivider extends React.Component {
   }
 
   calculateR1 = () => {
+    let result = {};
     let inR2 = value2Number(this.state.inR2);
     let inVin = value2Number(this.state.inVin);
     let inVout = value2Number(this.state.inVout);
     let outR1 = inVin / inVout * inR2 - inR2;
+    result["直接结果"] = [outR1, inR2, inVin, inVout, "0%"];
+
     let standardR1 = this.getStandardResistor(outR1);
-    let errorRate = (outR1 - standardR1) / standardR1 * 100;
-    errorRate = round(errorRate, 2);
-    errorRate = errorRate + "%";
-    let result = {
-      "直接结果": [outR1, inR2, inVin, inVout, "0%"],
-      "标准结果": [standardR1, inR2, inVin, inVout, errorRate],
-    }
+
+    // 锁定Vin 计算标准R1下的Vout，得出误差
+    let lockVinVout = inVin * inR2 / (standardR1 + inR2);
+    let lockVinError = (lockVinVout - inVout) / inVout * 100;
+    lockVinError = round(lockVinError, 2);
+    lockVinError = lockVinError + "%";
+    result["锁定Vin"] = [standardR1, inR2, inVin, lockVinVout, lockVinError];
+
+    // 锁定Vout 计算标准R1下的Vin，得出误差
+    let lockVoutVin = inVout * (standardR1 + inR2) / inR2
+    let lockVoutError = (lockVoutVin - inVin) / inVin * 100;
+    lockVoutError = round(lockVoutError, 2);
+    lockVoutError = lockVoutError + "%";
+    result["锁定Vout"] = [standardR1, inR2, lockVoutVin, inVout, lockVoutError];
+
     this.setState({
       outputTitle: "计算R1:",
       result: result,
@@ -240,18 +251,30 @@ class ResisterDivider extends React.Component {
   }
 
   calculateR2 = () => {
+    let result = {};
     let inR1 = value2Number(this.state.inR1);
     let inVin = value2Number(this.state.inVin);
     let inVout = value2Number(this.state.inVout);
     let outR2 = inR1 * inVout / (inVin - inVout);
+    result["直接结果"] = [inR1, outR2, inVin, inVout, "0%"];
+
+    // 获取标准电阻
     let standardR2 = this.getStandardResistor(outR2);
-    let errorRate = (standardR2 - outR2) / standardR2 * 100;
-    errorRate = round(errorRate, 2);
-    errorRate = errorRate + "%";
-    let result = {
-      "直接结果": [inR1, outR2, inVin, inVout, "0%"],
-      "标准结果": [inR1, standardR2, inVin, inVout, errorRate],
-    }
+
+    // 锁定Vin 计算标准R2下的Vout，得出误差
+    let lockVinVout = inVin * standardR2 / (inR1 + standardR2);
+    let lockVinError = (lockVinVout - inVout) / inVout * 100;
+    lockVinError = round(lockVinError, 2);
+    lockVinError = lockVinError + "%";
+    result["锁定Vin"] = [inR1, standardR2, inVin, lockVinVout, lockVinError];
+
+    // 锁定Vout 计算标准R2下的Vin，得出误差
+    let lockVoutVin = inVout * (inR1 + standardR2) / standardR2
+    let lockVoutError = (lockVoutVin - inVout) / inVout * 100;
+    lockVoutError = round(lockVoutError, 2);
+    lockVoutError = lockVoutError + "%";
+    result["锁定Vout"] = [inR1, standardR2, lockVoutVin, inVout, lockVoutError];
+
     this.setState({
       outputTitle: "计算R2:",
       result: result,

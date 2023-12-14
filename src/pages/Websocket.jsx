@@ -56,8 +56,10 @@ const Websocket = (props) => {
       setConnectionState("connected");
     }
     ws.onmessage = (e) => {
-      console.log(e.data);
-      setReceivedData(receivedData.concat(e.data));
+      let _receivedData = [...receivedData]
+      _receivedData.push(e.data);
+      _receivedData = _receivedData.slice(-10);
+      setReceivedData(_receivedData);
     }
     ws.onclose = () => {
       props.toast("", "连接断开");
@@ -70,6 +72,14 @@ const Websocket = (props) => {
   }
 
   const handleConnect = () => {
+    if (urlHostname === "") {
+      props.toast("错误", "请输入ip");
+      return;
+    }
+    if (urlPort === "") {
+      props.toast("错误", "请输入端口");
+      return;
+    }
     let url = urlProtocol + urlHostname + ":" + urlPort;
     window.localStorage.setItem("websocket-urlProtocol", urlProtocol);
     window.localStorage.setItem("websocket-urlHostname", urlHostname);
@@ -170,15 +180,14 @@ const SendCard = (props) => {
   }
 
   const handleAddDataPeice = (type) => {
-    updateSendDataBuffer((buffer) => {
-      switch (type) {
-        case "text": buffer.push({ type: "text", data: "", checked: false }); break;
-        case "json": buffer.push({ type: "json", data: {}, checked: false }); break;
-        case "array": buffer.push({ type: "array", data: [], checked: false }); break;
-        default: break;
-      }
-      return buffer;
-    });
+    let buffer = [...sendDataBuffer];
+    switch (type) {
+      case "text": buffer.push({ type: "text", data: "", checked: false }); break;
+      case "json": buffer.push({ type: "json", data: {}, checked: false }); break;
+      case "array": buffer.push({ type: "array", data: [], checked: false }); break;
+      default: break;
+    }
+    updateSendDataBuffer(buffer);
   }
 
   const handleTextChange = (index, e) => {
@@ -187,10 +196,10 @@ const SendCard = (props) => {
     updateSendDataBuffer(buffer);
   }
 
-  const handleJSONChange = (index, e) => {
+  const handleJSONChange = (index, content) => {
     let buffer = [...sendDataBuffer];
     try {
-      buffer[index].data = JSON.parse(e.target.value);
+      buffer[index].data = JSON.parse(content);
       updateSendDataBuffer(buffer);
     } catch (error) {
       console.log(error);
@@ -280,13 +289,15 @@ const SendCard = (props) => {
   }
 
   const handleSendPack = () => {
+    let toSendData = "";
     sendDataBuffer.forEach((dataPiece) => {
       if (!dataPiece.checked) {
         return;
       }
       let data = getData(dataPiece);
-      props.onSend(data);
+      toSendData += data;
     });
+    props.onSend(toSendData);
   }
 
   const handleSend = (index) => {
@@ -332,9 +343,9 @@ const SendCard = (props) => {
             component = <Editor
               height="10vh"
               defaultLanguage="json"
-              width="91.8%"
+              width="82%"
               value={JSON.stringify(dataPiece.data, null, 2)}
-              onChange={(e) => handleJSONChange(dataPieceIndex, e)}
+              onChange={(content) => handleJSONChange(dataPieceIndex, content)}
             />
             break;
           case "array":
@@ -392,7 +403,7 @@ const SendCard = (props) => {
             </ButtonGroup>
             {component}
             <Button variant="danger" onClick={(e) => handleDeleteDataPiece(dataPieceIndex)}>删除</Button>
-            <Button onClick={handleSend}>发送</Button>
+            <Button onClick={(e) => handleSend(dataPieceIndex)}>发送</Button>
           </InputGroup>
         </ListGroup.Item>
       })}
@@ -446,12 +457,13 @@ const ReceiveCard = (props) => {
         if (typeof data === "string") {
           try {
             data = JSON.parse(data);
+            data = JSON.stringify(data, null, 2)
             component = <Editor
               key={index}
               height="10vh"
               defaultLanguage="json"
               width="91.8%"
-              value={JSON.stringify(data, null, 2)}
+              value={data}
             />
           } catch (e) {
             component = <Card.Text key={index}>{data}</Card.Text>

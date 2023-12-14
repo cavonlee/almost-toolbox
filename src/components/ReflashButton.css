@@ -1,0 +1,11 @@
+.reflash-button {
+  padding: 0.5rem;
+  color: white;
+  opacity: 0.5;
+}
+
+/* hover */
+.reflash-button:hover {
+  opacity: 0.8;
+  cursor: pointer;
+}
